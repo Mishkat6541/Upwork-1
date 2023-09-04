@@ -1,0 +1,71 @@
+from selenium import webdriver
+import time
+import pandas as pd
+from selenium.webdriver.chrome.service import Service
+from bs4 import BeautifulSoup
+import re
+import openpyxl
+from openpyxl import load_workbook
+import requests
+
+# load excel file
+workbook = load_workbook(filename="Google_partner.xlsx")
+
+# open workbook
+sheet = workbook.active
+
+# save the file
+df = pd.read_excel('Google_partner.xlsx', header=None, usecols=[2])
+
+def open_tab():
+    PATH = r"C:\Program Files (x86)\chromedriver.exe"
+    options = webdriver.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    service = Service(PATH)
+    driver = webdriver.Chrome(options=options)
+
+    try:
+        for a in range(1655, 23297):
+            row = str(df.iloc[a])
+            url = re.findall(r'https?://\S+', row)
+            print(row)
+            print(url)
+
+            try:
+                # Check if the URL is accessible
+                response = requests.get(url[0])
+                if response.status_code != 200:
+                    print(f"URL not accessible: {url[0]}")
+                    continue
+
+                driver.get(url[0])
+
+
+                page_source = driver.page_source
+
+                # Parse the page source with Beautiful Soup
+                soup = BeautifulSoup(page_source, 'html.parser')
+
+                # Find all text containing email patterns
+                email_text = soup.get_text()
+
+                # Use regex to extract email addresses
+                email_addresses = re.findall(r'\S+@\S+', email_text)
+
+                # Print the extracted email addresses
+                for email in email_addresses:
+                    print(email)
+                    sheet["G" + str((a+1))] = email
+
+            except Exception as e:
+                print(f"Error accessing URL: {url[0]}\nError details: {str(e)}")
+                continue  # Continue to the next URL
+
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+    finally:
+        workbook.save(filename="Google_partner.xlsx")
+        driver.quit()
+
+open_tab()
